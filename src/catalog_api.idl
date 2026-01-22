@@ -1,0 +1,27 @@
+module catalog_api {
+	struct FileInfo {
+		string fileName;
+		string ownerIP;
+		long port;
+	};
+	
+	typedef sequence<FileInfo> fileList;
+	typedef sequence<string> nameList;
+	
+	interface FileTracker {
+		// Allows a client to list file on the server for sharing
+		void listFile(in string fileName, in string ownerIP, in long port);
+		
+		// Allow a client to delist a file on the server
+		void delistFile(in string fileName, in string ownerIP);
+		
+		// Search for a file; does not reveal the owner of the file
+		nameList searchFiles(in string query);
+		
+		// Get file information to enable initiating a file transfer
+		FileInfo getFileOwner(in string fileName);	
+		
+		// Indicates to the server that the client is still present and sharing its directory
+		void keepAlive(in string clientIP);
+	};
+};
