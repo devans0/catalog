@@ -23,13 +23,13 @@ public class DatabaseConfig {
 
 	/**
 	 * Creates the static context for the database configuration. Whenever a new DatabaseConfig
-	 * object is created it must be initialized using a properties file before it may be used
-	 * to generate a connection to a database.
+	 * object is created it must be initialized using a ConfigLoader generated from a properties 
+	 * file before it may be used to generate a connection to a database.
 	 * 
-	 * @param propFile containing the values required to create a valid database connection
+	 * @param config ConfigLoader object containing the configuration obtained from a properties file;
+	 * this object must be instantiated prior to initializing the DatabaseConfig object. 
 	 */
-	public static void initialize(String propFile) {
-		ConfigLoader config = new ConfigLoader(propFile);
+	public static void initialize(ConfigLoader config) {
 		url = config.getProperty("db.url");
 		user = config.getProperty("db.user");
 		pass = config.getProperty("db.password");

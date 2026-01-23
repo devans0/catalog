@@ -19,6 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.Properties;
+import java.util.TimeZone;
 
 import org.omg.CORBA.ORB;
 import org.omg.CosNaming.NameComponent;
@@ -41,10 +42,16 @@ public class CatalogServer {
 	 * @param period indicates the number of minutes that the reaper should wait between invocations
 	 */
 	private static void startReaper(long period) {
-		ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+		// Create a reaper daemon thread
+		ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(reaper -> {
+			Thread t = new Thread(reaper);
+			t.setDaemon(true);
+			return t;
+		});
 		
+		// Execute the reaper every period minutes
 		scheduler.scheduleAtFixedRate(() -> {
-			String sql = "DELETE FROM file_entries WHERE last_seen < NOW() - INTERVAL '2 minutes'";
+			String sql = "DELETE FROM file_entries WHERE last_seen < NOW() - INTERVAL '" + period + " minutes'";
 			try (Connection conn = DatabaseConfig.getConnection();
 				 Statement stmt = conn.createStatement()) {
 				
@@ -57,13 +64,47 @@ public class CatalogServer {
 			}
 		}, 0, period, TimeUnit.MINUTES);
 	}
+	
+	/**
+	 * Starts the orbd naming service that will handle connections to the server from remote clients
+	 * 
+	 * @param config ConfigLoader object generated from a properties file used to configure the server.
+	 */
+	private static void startNamingService(ConfigLoader config) {
+		try {
+			String port = config.getProperty("server.port", "1050");
+			ProcessBuilder pb = new ProcessBuilder("orbd", "-ORBInitialPort", port);
+
+			// Ensure that errors or messages are printed on the server console
+			pb.inheritIO();
+			pb.start();
+			
+			System.out.println("[SYS] Naming service (orbd) starting on port " + port);
+			
+			// Give orbd time to bind to a socket before server initialization proceeds
+			Thread.sleep(2000);
+		} catch (Exception e) {
+			System.err.println("[SYS] Warning: could not start orbd automatically. "
+							   + "It may already be running or not in your PATH.");
+		}
+	}
 
 	public static void main(String[] args) {
-		// Initialize the database configuration so that a connection to it may be formed
-		DatabaseConfig.initialize("server.properties");
+		// Load the configuration and initialize the DatabaseConfig
+		ConfigLoader config = new ConfigLoader("server.properties");
+
+		// Set time zone; this avoids any issues arising from the reaper and the system
+		// times being at odds with one another potentially causing premature reaping
+		String timezone = config.getProperty("app.timezone", "UTC");
+		TimeZone.setDefault(TimeZone.getTimeZone(timezone));
+		
+		// Detect OS and start orbd automatically
+		startNamingService(config);
+		
+		// Initialize the database configuration
+		DatabaseConfig.initialize(config);
 
 		// Configure the ORB
-		ConfigLoader config = new ConfigLoader("server.properties");
 		Properties orbProps = new Properties();
 		orbProps.put("org.omg.CORBA.ORBInitialPort", config.getProperty("server.port", "1050"));
 		orbProps.put("org.omg.CORBA.ORBInitialHost", config.getProperty("server.host", "localhost"));
@@ -99,30 +140,3 @@ public class CatalogServer {
 		}
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
