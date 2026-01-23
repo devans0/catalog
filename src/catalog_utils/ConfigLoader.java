@@ -42,7 +42,7 @@ public class ConfigLoader {
 		return props.getProperty(key);
 	}
 	
-	/* Overload: provide an optional default configuration value for increased robustness */
+	/* Overload: provide an optional default configuration value */
 	public String getProperty(String key, String defaultValue) {
 		return props.getProperty(key, defaultValue);
 	}
@@ -56,4 +56,26 @@ public class ConfigLoader {
 	public int getIntProperty(String key) {
 		return Integer.parseInt(props.getProperty(key));
 	}
+	
+	/**
+	 * Fetches the boolean value associated with a given key and returns its value
+	 * @param key indicating the property to be returned from the configuration file.
+	 * @return boolean corresponding to desired key
+	 */
+	public boolean getBooleanProperty(String key) {
+		return Boolean.parseBoolean(props.getProperty(key));
+	}
+	
+	/* Overload: provide an optional default configuration value */
+	public boolean getBooleanProperty(String key, boolean defaultValue) {
+		String val = props.getProperty(key);
+		if (val == null) {
+			return defaultValue;
+		}
+		return Boolean.parseBoolean(val);
+	}
 }
+
+
+
+
