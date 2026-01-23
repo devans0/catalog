@@ -42,6 +42,11 @@ public class ConfigLoader {
 		return props.getProperty(key);
 	}
 	
+	/* Overload: provide an optional default configuration value for increased robustness */
+	public String getProperty(String key, String defaultValue) {
+		return props.getProperty(key, defaultValue);
+	}
+	
 	/**
 	 * Fetches the integer value associated with a given key
 	 * @param key indicating which property to access; must be associated with an
