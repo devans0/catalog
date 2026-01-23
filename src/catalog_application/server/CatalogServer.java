@@ -174,8 +174,8 @@ public class CatalogServer {
 				
 				int deletedRows = stmt.executeUpdate(sql);
 				if (deletedRows > 0) {
-					System.out.println("[REAPER] Purged " + deletedRows + " stale files.");
-				}
+					System.out.println("[REAPER] Purged " + deletedRows + " stale file(s).");
+				} 
 			} catch (SQLException sqle) {
 				System.err.println("[REAPER] Error during cleanup: " + sqle.getMessage());
 			}
