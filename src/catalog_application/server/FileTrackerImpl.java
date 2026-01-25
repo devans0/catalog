@@ -47,7 +47,7 @@ public class FileTrackerImpl extends FileTrackerPOA {
 		} catch (SQLException sqle) {
 			System.err.println("[DB] Error in listFile: " + sqle.getMessage());
 		}
-	}
+	} // listFile
 
 	@Override
 	/**
@@ -78,7 +78,7 @@ public class FileTrackerImpl extends FileTrackerPOA {
 		} catch (SQLException sqle) {
 			System.err.println("[DB] Error in delistFile: " + sqle.getMessage());
 		}
-	}
+	} // delistFile
 
 	@Override
 	public FileInfo[] searchFiles(String query) {
@@ -108,7 +108,7 @@ public class FileTrackerImpl extends FileTrackerPOA {
 		
 		// CORBA expects an array type per the IDL interface specification
 		return fileList.toArray(new FileInfo[0]);
-	}
+	} // searchFiles
 
 	/**
 	 * Finds the FileInfo for an exact file name.
@@ -145,7 +145,7 @@ public class FileTrackerImpl extends FileTrackerPOA {
 		
 		// No exact match was found for the file
 		return null;
-	}
+	} // getFileOwner
 
 	/**
 	 * Enables updating the last_seen attribute of a file that is listed in the catalog server. This
@@ -175,5 +175,5 @@ public class FileTrackerImpl extends FileTrackerPOA {
 		} catch (SQLException sqle) {
 			System.err.println("[DB] Error in keepAlive: " + sqle.getMessage());
 		}
-	}
+	} // keepAlive
 }

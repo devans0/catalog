@@ -39,9 +39,15 @@ public class DatabaseConfig {
 		url = config.getProperty("db.url");
 		user = config.getProperty("db.user");
 		pass = config.getProperty("db.password");
+		
+		/*
+		 * Initialized must be true before database configuration or getConnection(), called from
+		 * within verifyDatabase(), will throw an error assuming that a connection is being made 
+		 * against an uninitialized database
+		 */
 		initialized = true;
 		verifyDatabase();
-	} 
+	} // initialize
 	
 	/**
 	 * Verifies that the database exists, is accepting connections, and contains the tables needed
@@ -73,7 +79,7 @@ public class DatabaseConfig {
 			System.err.println("[DB] Critical Database Error: " + sqle.getMessage());
 			System.exit(1);
 		}
-	}
+	} // verifyDatabase
 	
 	/**
 	 * verifyDatabase() helper. Runs the setup.sql script to initialize the table schema required by the server.
@@ -92,7 +98,7 @@ public class DatabaseConfig {
 			System.err.println("[DB] Could not find setup.sql in root directory.");
 			throw new SQLException("Initialization script missing.", ioe);
 		}
-	}
+	} // runSetupScript
 	
 	/**
 	 * Returns a java.sql.Conneciton to the database described by the properties file used to
@@ -114,5 +120,5 @@ public class DatabaseConfig {
 		} catch (ClassNotFoundException cnf) {
 			throw new SQLException("PostgreSQL Driver not found in classpath.", cnf);
 		}
-	}
+	} // getConnection
 }

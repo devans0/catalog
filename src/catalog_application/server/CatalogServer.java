@@ -114,7 +114,7 @@ public class CatalogServer {
 			System.err.println("ERROR: " + e.getMessage());
 			e.printStackTrace();
 		}
-	}
+	} // main
 
 	/**
 	 * Starts the orbd naming service that will handle connections to the server from remote clients
@@ -148,7 +148,7 @@ public class CatalogServer {
 		}
 		// Process creation failed
 		return null;
-	}
+	} // startNamingService
 
 	/**
 	 * The database reaper periodically scans the database to determine if there are 
@@ -180,7 +180,7 @@ public class CatalogServer {
 				System.err.println("[REAPER] Error during cleanup: " + sqle.getMessage());
 			}
 		}, 1, period, TimeUnit.MINUTES);
-	}
+	} // startReaper
 }
 
 

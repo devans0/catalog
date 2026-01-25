@@ -60,10 +60,22 @@ configured to any integer number of minutes in the server.properties file.
 Run the server and execute the following SQL against the database manually to enter
 a zombie row into the table:
 
-    INSERT INTO file_entries (owner_id, filename, ip_address, port, last_seen)
-    VALUES (gen_random_uuid(), 'ghost.txt', '127.0.0.1', 9000, NOW - INTERVAL '5 minutes');
+    INSERT INTO file_entries (peer_id, filename, owner_ip, owner_port, last_seen)
+    VALUES (gen_random_uuid(), 'ghost.txt', '127.0.0.1', 9000, NOW() - INTERVAL '5 minutes');
 
 Now wait for the reaper to execute and look for the appropriate log entry printed
 to the console:
 
+    $ java -cp "$PWD/bin:$PWD/lib/postgresql-42.7.9.jar" catalog_application.server.CatalogServer
+    [SYS] Naming service (orbd) starting on port 1050
+    [SYS] Local orbd instance started successfully.
+    [DB] Database schema verfied.
+    Catalog Server registered as 'CatalogService'
     [REAPER] Purged 1 stale file(s).
+
+Next verify that the row is removed from the database:
+
+    catalog_db=# SELECT * FROM file_entries;
+     id | file_name | peer_id | owner_ip | owner_port | last_seen
+    ----+-----------+---------+----------+------------+-----------
+    (0 rows)

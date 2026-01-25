@@ -31,7 +31,7 @@ public class ConfigLoader {
 			System.err.println("Could not find configuration file: " + fileName);
 			ioe.printStackTrace();
 		}
-	}
+	} // ctor
 	
 	/**
 	 * Returns the value associated with the provided key
@@ -40,12 +40,12 @@ public class ConfigLoader {
 	 */
 	public String getProperty(String key) {
 		return props.getProperty(key);
-	}
+	} // getProperty
 	
 	/* Overload: provide an optional default configuration value */
 	public String getProperty(String key, String defaultValue) {
 		return props.getProperty(key, defaultValue);
-	}
+	} // getProperty
 	
 	/**
 	 * Fetches the integer value associated with a given key
@@ -55,7 +55,7 @@ public class ConfigLoader {
 	 */
 	public int getIntProperty(String key) {
 		return Integer.parseInt(props.getProperty(key));
-	}
+	} // getIntProperty
 	
 	/**
 	 * Fetches the boolean value associated with a given key and returns its value
@@ -64,7 +64,7 @@ public class ConfigLoader {
 	 */
 	public boolean getBooleanProperty(String key) {
 		return Boolean.parseBoolean(props.getProperty(key));
-	}
+	} // getBooleanProperty  
 	
 	/* Overload: provide an optional default configuration value */
 	public boolean getBooleanProperty(String key, boolean defaultValue) {
@@ -73,7 +73,7 @@ public class ConfigLoader {
 			return defaultValue;
 		}
 		return Boolean.parseBoolean(val);
-	}
+	} // getBooleanProperty
 }
 
 
