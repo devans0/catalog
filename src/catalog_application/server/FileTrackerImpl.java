@@ -12,6 +12,8 @@ package catalog_application.server;
 
 import catalog_api.FileInfo;
 import catalog_api.FileTrackerPOA;
+import catalog_utils.ConfigLoader;
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -82,7 +84,7 @@ public class FileTrackerImpl extends FileTrackerPOA {
 
 	@Override
 	public FileInfo[] searchFiles(String query) {
-		String sql = "SELECT file_name, owner_IP, owner_port FROM file_entries " +
+		String sql = "SELECT id, file_name, owner_IP, owner_port FROM file_entries " +
 					 "WHERE file_name ILIKE ?";
 		
 		List<FileInfo> fileList = new ArrayList<>();
@@ -96,6 +98,7 @@ public class FileTrackerImpl extends FileTrackerPOA {
 			try (ResultSet rs = pstmt.executeQuery()) {
 				while (rs.next()) {
 					fileList.add(new FileInfo(
+							rs.getInt("id"),
 							rs.getString("file_name"),
 							rs.getString("owner_ip"),
 							rs.getInt("owner_port")
@@ -117,22 +120,23 @@ public class FileTrackerImpl extends FileTrackerPOA {
 	 * @return FileInfo the information required to download an exact file.
 	 */
 	@Override
-	public FileInfo getFileOwner(String fileName) {
+	public FileInfo getFileOwner(int fileID) {
 		// This search should benefit from indexing; searchFiles() is not used to avoid
 		// duplicating the searches when gathering data vs. getting particular file info
 		String sql = "SELECT file_name, owner_ip, owner_port FROM file_entries " +
-					 "WHERE file_name = ? LIMIT 1";
+					 "WHERE id = ? LIMIT 1";
 		
 		try (Connection conn = DatabaseConfig.getConnection();
 			 PreparedStatement pstmt = conn.prepareStatement(sql)) {
 			
 			// Construct the prepared statement and execute it
-			pstmt.setString(1,  fileName);
+			pstmt.setInt(1, fileID);
 			try (ResultSet rs = pstmt.executeQuery()) {
 				// There is only one row or no rows in the ResultSet
 				if (rs.next()) {
 					// Package the database return into a FileInfo object and return it
 					return new FileInfo (
+							fileID,
 							rs.getString("file_name"),
 							rs.getString("owner_ip"),
 							rs.getInt("owner_port")
@@ -146,6 +150,17 @@ public class FileTrackerImpl extends FileTrackerPOA {
 		// No exact match was found for the file
 		return null;
 	} // getFileOwner
+	
+	/**
+	 * Provides the caller with the configured period of the file entry reaper
+	 * 
+	 * @return int The length of the reaper period in minutes
+	 */
+	@Override
+	public int getTTL() {
+		ConfigLoader config = new ConfigLoader("server.properties");
+		return config.getIntProperty("server.reaper_interval_minutes");
+	}
 
 	/**
 	 * Enables updating the last_seen attribute of a file that is listed in the catalog server. This
@@ -156,16 +171,15 @@ public class FileTrackerImpl extends FileTrackerPOA {
 	 * @param clientPort the port that the client is using to share the file
 	 */
 	@Override
-	public void keepAlive(String clientID, int clientPort) {
+	public void keepAlive(String clientID) {
 		String sql = "UPDATE file_entries SET last_seen = CURRENT_TIMESTAMP " +
-					 "WHERE owner_ip = ? AND owner_port = ?";
+					 "WHERE peer_id = ?";
 		
 		try (Connection conn = DatabaseConfig.getConnection();
 			 PreparedStatement pstmt = conn.prepareStatement(sql)) {
 			
 			// Construct the prepared statement and execute it against the database
 			pstmt.setString(1, clientID);
-			pstmt.setInt(2, clientPort);
 			int rows = pstmt.executeUpdate();
 			
 			// Report any heartbeats that do not correspond to a clientIP and port pair

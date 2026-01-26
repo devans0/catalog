@@ -1,5 +1,6 @@
 module catalog_api {
 	struct FileInfo {
+		long fileID;
 		string fileName;
 		string ownerIP;
 		long port;
@@ -9,6 +10,9 @@ module catalog_api {
 	typedef sequence<string> nameList;
 	
 	interface FileTracker {
+		// Determines server configuration for maximum file lifetime without a heartbeat
+		long getTTL();
+		
 		// Allows a client to list file on the server for sharing
 		void listFile(in string fileName, in string ownerID, in string ownerIP, in long port);
 		
@@ -19,9 +23,9 @@ module catalog_api {
 		fileList searchFiles(in string query);
 		
 		// Get file information to enable initiating a file transfer
-		FileInfo getFileOwner(in string fileName);
+		FileInfo getFileOwner(in long fileID);
 		
 		// Indicates to the server that the client is still present and sharing its directory
-		void keepAlive(in string clientID, in long port);
+		void keepAlive(in string peerID);
 	};
 };
