@@ -57,6 +57,15 @@ public class ConfigLoader {
 		return Integer.parseInt(props.getProperty(key));
 	} // getIntProperty
 	
+	/* Overload: provide an optional default configuration value */
+	public int getIntProperty(String key, int defaultVal) {
+		try {
+			int result = Integer.parseInt(props.getProperty(key));
+			return result;
+		} catch (NumberFormatException nfe) { }
+		return defaultVal;
+	} // getIntProperty
+	
 	/**
 	 * Fetches the boolean value associated with a given key and returns its value
 	 * @param key indicating the property to be returned from the configuration file.
