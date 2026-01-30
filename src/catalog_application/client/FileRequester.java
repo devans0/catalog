@@ -20,7 +20,7 @@ import java.nio.file.Files;
 
 public class FileRequester {
 	
-	public static void downloadFile(catalog_api.FileInfo info, Path downloadDir) {
+	public static void downloadFile (catalog_api.FileInfo info, Path downloadDir) {
 		System.out.println("[P2P] Attempting to download: " + info.fileName);
 		
 		// Be sure that the download directory exists
