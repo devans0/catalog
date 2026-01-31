@@ -12,11 +12,20 @@ package catalog_application.server;
 
 import catalog_api.FileInfo;
 import catalog_api.FileTrackerPOA;
+import catalog_api.SearchResult;
 import catalog_utils.ConfigLoader;
 
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+
+/**
+ * FileTrackerImpl implements the interface for the Catalog Server as defined in the IDL specification for
+ * the server. This interface provides a means for clients to list files on the server as available for
+ * sharing, keep the server aware that these files are still actively being shared, to de-list those files, 
+ * to search for specific files, and to retrieve the information necessary to set up a peer connection with
+ * another client to download files from them.
+ */
 
 public class FileTrackerImpl extends FileTrackerPOA {
 
@@ -82,12 +91,21 @@ public class FileTrackerImpl extends FileTrackerPOA {
 		}
 	} // delistFile
 
+	/**
+	 * This method allows for searching the database for any listings that match a provided file name.
+	 * Each matching file, along with its database-side ID are returned to the caller in an array
+	 * of type SearchResult
+	 * 
+	 * @param query the file name that constitutes the search term for the 
+	 * @return SearchResult[] containing the search result values for all the files found that correspond
+	 * to the provided query.
+	 */
 	@Override
-	public FileInfo[] searchFiles(String query) {
-		String sql = "SELECT id, file_name, owner_IP, owner_port FROM file_entries " +
+	public SearchResult[] searchFiles(String query) {
+		String sql = "SELECT id, file_name FROM file_entries " +
 					 "WHERE file_name ILIKE ?";
 		
-		List<FileInfo> fileList = new ArrayList<>();
+		List<SearchResult> fileList = new ArrayList<>();
 
 		try (Connection conn = DatabaseConfig.getConnection(); 
 			 PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -97,11 +115,9 @@ public class FileTrackerImpl extends FileTrackerPOA {
 			// Iterate over the results and add new FileInfo objects to the list
 			try (ResultSet rs = pstmt.executeQuery()) {
 				while (rs.next()) {
-					fileList.add(new FileInfo(
+					fileList.add(new SearchResult(
 							rs.getInt("id"),
-							rs.getString("file_name"),
-							rs.getString("owner_ip"),
-							rs.getInt("owner_port")
+							rs.getString("file_name")
 					));
 				}
 			}
@@ -110,7 +126,7 @@ public class FileTrackerImpl extends FileTrackerPOA {
 		}
 		
 		// CORBA expects an array type per the IDL interface specification
-		return fileList.toArray(new FileInfo[0]);
+		return fileList.toArray(new SearchResult[0]);
 	} // searchFiles
 
 	/**
@@ -164,23 +180,33 @@ public class FileTrackerImpl extends FileTrackerPOA {
 
 	/**
 	 * Enables updating the last_seen attribute of a file that is listed in the catalog server. This
-	 * stops the file from becoming stale and being removed by the reaper. The address/port combination
-	 * is used to identify the owner of the file in the database.
+	 * stops the file from becoming stale and being removed by the reaper. The client is identified
+	 * through the use of a UUID which is used to update all files that that client has listed
+	 * with the server.
 	 * 
+	 * The boolean return for this function aims to signal to a client that calls it that the update
+	 * actually performed an update in the database. If it returns false, this means that the client
+	 * does not actually have any files listed in the database. This is used to signal that the client
+	 * must refresh their shared files with the server, as they have all been reaped or delisted in some
+	 * other way.
+	 * 	  
 	 * @param clientID UUID of the client sending the heartbeat
 	 * @param clientPort the port that the client is using to share the file
+	 * @return true if the signal updated any records in the database; false otherwise, indicating that
+	 *         the client does not have any files listed on the server
 	 */
 	@Override
-	public void keepAlive(String clientID) {
+	public boolean keepAlive(String clientID) {
 		String sql = "UPDATE file_entries SET last_seen = CURRENT_TIMESTAMP " +
 					 "WHERE peer_id = ?";
 		
+		int rows = 0;
 		try (Connection conn = DatabaseConfig.getConnection();
 			 PreparedStatement pstmt = conn.prepareStatement(sql)) {
 			
 			// Construct the prepared statement and execute it against the database
 			pstmt.setString(1, clientID);
-			int rows = pstmt.executeUpdate();
+			rows = pstmt.executeUpdate();
 			
 			// Report any heartbeats that do not correspond to a clientIP and port pair
 			if (rows == 0) {
@@ -189,5 +215,33 @@ public class FileTrackerImpl extends FileTrackerPOA {
 		} catch (SQLException sqle) {
 			System.err.println("[DB] Error in keepAlive: " + sqle.getMessage());
 		}
+		return rows > 0;
 	} // keepAlive
+
+	/**
+	 * This method disconnects a client identified by its ownerID. A disconnection involves removing all
+	 * files listed by the client. After sending this signal, a client is expected to immediately cease
+	 * listing any files with the server.
+	 * 
+	 * NOTE: This method highlights the imperative that ownerIDs remain a secret held by the only the
+	 * server and a given client; if this information is ever discovered by another client, they become
+	 * capable of arbitrarily disconnecting any other user for which the ownerID is known.
+	 * 
+	 * @param ownerID the String UUID that uniquely identifies a given client.
+	 */
+	@Override
+	public void disconnect(String ownerID) {
+		String sql = "DELETE FROM file_entries WHERE peer_id = ?";
+		
+		try (Connection conn = DatabaseConfig.getConnection(); 
+			 PreparedStatement pstmt = conn.prepareStatement(sql)) {
+			
+			pstmt.setString(1, ownerID);
+			pstmt.execute();
+
+		} catch (SQLException sqle) {
+			System.err.println("[DB] Error in disconnect: Database operation failed.");
+			sqle.printStackTrace();
+		}
+	}
 }

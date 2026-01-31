@@ -17,7 +17,9 @@ import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashSet;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.stream.Stream;
 
@@ -42,6 +44,7 @@ public class CatalogClient {
 	private static Thread serverThread;
 	private static Path shareDir;
 	private static Path downloadDir;
+	private static ShareManager shareManager;
 	
 	public static void main(String args[]) {
 		// Load the configuration file which controls the behaviour of the client
@@ -61,25 +64,27 @@ public class CatalogClient {
 		shareDir = Paths.get(config.getProperty("client.share_dir", "./share"));
 		downloadDir = Paths.get(config.getProperty("client.download_dir", "./downloads"));
 
-		// Shutdown hook to ensure graceful shutdown of the background file server
-		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-			System.out.println("[SYS] Shutdown initiated...");
-			if (serverThread != null) {
-				serverThread.interrupt();
-			}
-		}));
+		// Set shutdown tasks
+		setShutdownHook();
 		
 		// Start the GUI
 		SwingUtilities.invokeLater(() -> {
 			CatalogGUI gui = new CatalogGUI(peerID, downloadDir);
 			gui.setVisible(true);
 			
-			// Create new thread for connection initialization to avoid freezing the GUI
+			/*
+			 * This thread is responsible for initializing the connection to the server and starting the
+			 * Share Manager and Peer Server. These tasks occur serially but must be relegated to a new
+			 * thread in order to keep the GUI responsive even if these tasks hang.
+			 */
 			new Thread(() -> {
 				// Attempt connection to the server
 				if (initializeConnection(args, config)) {
-					// Perform initial registration of the local files
-					listLocalFiles(shareDir);
+					// Invoke the share manager to periodically scan the share directory and list or delist
+					// any files that are added to or removed from that directory
+					shareManager = new ShareManager(shareDir, tracker, peerID, localAddress, localPort);
+					int heartbeatPeriodSeconds = Math.max(10, (int) (60 * 0.75 * tracker.getTTL()));
+					shareManager.startMonitoring(heartbeatPeriodSeconds);
 
 					// Pass the now-instantiated tracker to the GUI 
 					SwingUtilities.invokeLater(() -> gui.setTracker(tracker));
@@ -106,10 +111,27 @@ public class CatalogClient {
 	} // main
 	
 	/**
+	 * Sets the shutdown hook
+	 */
+	private static void setShutdownHook() {
+		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+			System.out.println("[SYS] Shutdown initiated...");
+			// Alert the server that sharing is ending
+			if (shareManager != null) {
+				shareManager.disconnect();
+			}
+			// Shut down the peer server
+			if (serverThread != null) {
+				serverThread.interrupt();
+			}
+		}));
+	} // setShutdownHook
+	
+	/**
 	 * Determines the client's local IP address which is necessary for allowing other clients to connect
 	 * and download files once they have been found on the share server.
 	 * 
-	 * Note: this method for finding the local address was found via Baeldung:
+	 * Note: this method for finding the local address was found via a Baeldung article:
 	 * https://www.baeldung.com/java-get-ip-address
 	 * 
 	 * @return a String representing the local IP address of the client program.
@@ -164,44 +186,6 @@ public class CatalogClient {
 		// Connection failed due to exception above
 		return false;
 	} // initializeConnection
-	
-	/**
-	 * This method scans the share directory and lists each file found there provided it is a regular file
-	 * and it is not a hidden file. This method is to be used for initial share directory scanning and listing
-	 * whereas periodic updates to the listings are handled by updateLocalFileList.
-	 * 
-	 * @param sharePath the path corresponding to the directory that is to be shared with other peers
-	 */
-	public static void listLocalFiles(Path sharePath) {
-		// Generate a new thread to avoid hanging the GUI while this method executes
-		new Thread(() -> {
-			/*
-			 * This stream expression first filters out all files in the share directory that are not regular
-			 * files. It then filters the resulting stream and removes any files that are hidden. Finally,
-			 * each of the resulting files that made it through each of these filters is listed with the 
-			 * share server via the FileTracker.
-			 */
-			try (Stream<Path> stream = Files.list(sharePath)) {
-				stream.filter(Files::isRegularFile)
-					  .filter(p -> {
-						  try {
-							  return !Files.isHidden(p);
-						  } catch (IOException ioe) {
-							  return false;
-						  }
-					  })
-					  .forEach(p -> {
-						  try {
-							  tracker.listFile(peerID, p.getFileName().toString(), localAddress, localPort);
-						  } catch (Exception e) {
-							  System.err.println("[ERROR] Failed to register: " + p.getFileName());
-						  }
-					  });
-			} catch (IOException ioe) {
-				System.err.println("[SYS] Could not read share directory: " + ioe.getMessage());
-			}
-		}).start();
-	} // listLocalFiles
 }
 
 

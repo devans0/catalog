@@ -6,8 +6,12 @@ module catalog_api {
 		long port;
 	};
 	
-	typedef sequence<FileInfo> fileList;
-	typedef sequence<string> nameList;
+	struct SearchResult {
+		long fileID;
+		string fileName;
+	};
+	
+	typedef sequence<SearchResult> searchResults;
 	
 	interface FileTracker {
 		// Determines server configuration for maximum file lifetime without a heartbeat
@@ -19,13 +23,16 @@ module catalog_api {
 		// Allow a client to delist a file on the server
 		void delistFile(in string fileName, in string ownerID);
 		
+		// Disconnect a client from the server and delist all of its shared files
+		void disconnect(in string ownerID);
+		
 		// Search for a file; does not reveal the owner of the file
-		fileList searchFiles(in string query);
+		searchResults searchFiles(in string query);
 		
 		// Get file information to enable initiating a file transfer
 		FileInfo getFileOwner(in long fileID);
 		
 		// Indicates to the server that the client is still present and sharing its directory
-		void keepAlive(in string peerID);
+		boolean keepAlive(in string peerID);
 	};
 };

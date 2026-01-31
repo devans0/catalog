@@ -168,7 +168,9 @@ public class CatalogServer {
 		
 		// Execute the reaper every period minutes
 		scheduler.scheduleAtFixedRate(() -> {
-			String sql = "DELETE FROM file_entries WHERE last_seen < NOW() - INTERVAL '" + period + " minutes'";
+			// Reaper actually runs every period+1 minutes to allow some room for network jitters and any race
+			// conditions with a client updating at the exact same moment that the reaper runs
+			String sql = "DELETE FROM file_entries WHERE last_seen < NOW() - INTERVAL '" + (period + 1) + " minutes'";
 			try (Connection conn = DatabaseConfig.getConnection();
 				 Statement stmt = conn.createStatement()) {
 				
@@ -182,5 +184,3 @@ public class CatalogServer {
 		}, 1, period, TimeUnit.MINUTES);
 	} // startReaper
 }
-
-
