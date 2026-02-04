@@ -183,6 +183,9 @@ public class CatalogGUI extends JFrame {
 			return;
 		}
 
+		// Disable the search button while a search thread is active to
+		// limit thread generation
+		this.searchButton.setEnabled(false);
 		new Thread(() -> {
 			try {
 				System.out.println("[SYS] Querying server for: " + query);
@@ -204,6 +207,8 @@ public class CatalogGUI extends JFrame {
 				});
 			} catch (Exception ex) {
 				System.err.println("[ERROR] Search failed: " + ex.getMessage());
+			} finally {
+				this.searchButton.setEnabled(true);
 			}
 		}).start();
 	} // handleSearch

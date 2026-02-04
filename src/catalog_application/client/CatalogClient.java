@@ -35,6 +35,10 @@ import catalog_api.FileTrackerHelper;
 import catalog_utils.ConfigLoader;
 
 public class CatalogClient {
+	// Default values
+	private static final int DEFAULT_PORT = 2050;
+	private static final String DEFAULT_SHARE_DIR = "./share";
+	private static final String DEFAULT_DOWNLOAD_DIR = "./downloads";
 	
 	// Globals
 	private static FileTracker tracker;
@@ -47,6 +51,11 @@ public class CatalogClient {
 	private static ShareManager shareManager;
 	
 	public static void main(String args[]) {
+		// Command-line runtime customization 
+		if (args.length != 0) {
+			
+		}
+		
 		// Load the configuration file which controls the behaviour of the client
 		ConfigLoader config = new ConfigLoader("client.properties");
 		
@@ -65,7 +74,7 @@ public class CatalogClient {
 		downloadDir = Paths.get(config.getProperty("client.download_dir", "./downloads"));
 
 		// Set shutdown tasks
-		setShutdownHook();
+		setShutdownHooks();
 		
 		// Start the GUI
 		SwingUtilities.invokeLater(() -> {
@@ -113,7 +122,7 @@ public class CatalogClient {
 	/**
 	 * Sets the shutdown hook
 	 */
-	private static void setShutdownHook() {
+	private static void setShutdownHooks() {
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 			System.out.println("[SYS] Shutdown initiated...");
 			// Alert the server that sharing is ending
@@ -187,18 +196,3 @@ public class CatalogClient {
 		return false;
 	} // initializeConnection
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
