@@ -10,14 +10,17 @@
 
 package catalog_application.server;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+
 import catalog_api.FileInfo;
 import catalog_api.FileTrackerPOA;
 import catalog_api.SearchResult;
 import catalog_utils.ConfigLoader;
-
-import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * FileTrackerImpl implements the interface for the Catalog Server as defined in the IDL specification for
@@ -39,8 +42,8 @@ public class FileTrackerImpl extends FileTrackerPOA {
 	 * @param ownerPort the port that the owner of the file wishes to accept connections on.
 	 */
 	@Override
-	public void listFile(String fileName, String ownerID, String ownerIP, int ownerPort) {
-		String sql = "INSERT INTO file_entries (file_name, peer_id, owner_ip, owner_port, last_seen) " +
+	public void listFile(String ownerID, String fileName, String ownerIP, int ownerPort) {
+		String sql = "INSERT INTO file_entries (peer_id, file_name, owner_ip, owner_port, last_seen) " +
 					 "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP) " +
 					 "ON CONFLICT (file_name, owner_ip, owner_port) " +
 					 "DO UPDATE SET last_seen = CURRENT_TIMESTAMP";
@@ -48,10 +51,10 @@ public class FileTrackerImpl extends FileTrackerPOA {
 		try (Connection conn = DatabaseConfig.getConnection();
 			PreparedStatement pstmt = conn.prepareStatement(sql)) {
 			
-			pstmt.setString(1, fileName);
-			pstmt.setString(2, ownerID);
+			pstmt.setString(1, ownerID);
+			pstmt.setString(2, fileName);
 			pstmt.setString(3,  ownerIP);
-			pstmt.setInt(4,  ownerPort);
+			pstmt.setInt(4, ownerPort);
 			pstmt.executeUpdate();
 			
 			System.out.println("[DB] Listing updated: " + fileName + " from " + ownerIP);
@@ -197,6 +200,13 @@ public class FileTrackerImpl extends FileTrackerPOA {
 	 */
 	@Override
 	public boolean keepAlive(String clientID) {
+		// Sanity check
+		// TODO REMOVE
+		if (clientID == null || clientID.trim().isEmpty()) {
+			System.err.println("[AUTH] Rejected null/empty heartbeat ID.");
+			return false;
+		}
+		
 		String sql = "UPDATE file_entries SET last_seen = CURRENT_TIMESTAMP " +
 					 "WHERE peer_id = ?";
 		

@@ -10,18 +10,14 @@
 
 package catalog_application.client;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashSet;
 import java.util.Properties;
-import java.util.Set;
 import java.util.TimeZone;
-import java.util.stream.Stream;
 
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
@@ -38,9 +34,9 @@ public class CatalogClient {
 	// Default values
 	private static final int DEFAULT_PORT = 2050;
 	private static final String DEFAULT_TZ = "UTC";
-	private static final String DEFAULT_SHARE_DIR = "./share";
-	private static final String DEFAULT_DOWNLOAD_DIR = "./downloads";
-	
+	private static final String DEFAULT_SHARE_DIR = "catalog-share";
+	private static final String DEFAULT_DOWNLOAD_DIR = "catalog-download";
+
 	// Globals
 	private static FileTracker tracker;
 	private static String peerID;
@@ -50,29 +46,30 @@ public class CatalogClient {
 	private static Path shareDir;
 	private static Path downloadDir;
 	private static ShareManager shareManager;
-	
+
 	public static void main(String args[]) {
 
 		// Load the configuration file which controls the behaviour of the client
 		ConfigLoader config = new ConfigLoader("client.properties");
-		
+
 		// Set the client peer identity
 		IdentityManager IDManager = new IdentityManager();
 		peerID = IDManager.getPeerID();
 		localAddress = getLocalIP();
-		localPort = config.getIntProperty("client.share_port", DEFAULT_PORT);	
-		
+		localPort = config.getIntProperty("client.share_port", DEFAULT_PORT);
+
 		// Set the time zone
 		String timezone = config.getProperty("app.timezone", DEFAULT_TZ);
 		TimeZone.setDefault(TimeZone.getTimeZone(timezone));
-		
+
 		// Set the share and download directories
 		shareDir = Paths.get(config.getProperty("client.share_dir", DEFAULT_SHARE_DIR));
 		downloadDir = Paths.get(config.getProperty("client.download_dir", DEFAULT_DOWNLOAD_DIR));
 
 		/*
 		 * Command-line runtime customization. When run from the command line, arguments
-		 * must be supplied to the Catalog Client in the following order:
+		 * must be supplied to the Catalog Client in the following order if customized
+		 * non-persistent values are desired:
 		 * 
 		 * [port] [share directory] [download directory]
 		 * 
@@ -87,53 +84,94 @@ public class CatalogClient {
 			downloadDir = Paths.get(args[2]);
 		}
 
+		/*
+		 * Be certain that the critical directories for sharing and downloading exist.
+		 * This call may cause the program to crash if either the share or download
+		 * directories do not exist and there is a problem in creating them.
+		 */
+		initDirectories();
+
 		// Set shutdown tasks
 		setShutdownHooks();
-		
+
 		// Start the GUI
 		SwingUtilities.invokeLater(() -> {
 			CatalogGUI gui = new CatalogGUI(peerID, downloadDir);
 			gui.setVisible(true);
-			
+
 			/*
-			 * This thread is responsible for initializing the connection to the server and starting the
-			 * Share Manager and Peer Server. These tasks occur serially but must be relegated to a new
-			 * thread in order to keep the GUI responsive even if these tasks hang.
+			 * This thread is responsible for initializing the connection to the server and
+			 * starting the Share Manager and Peer Server. These tasks occur serially but
+			 * must be relegated to a new thread in order to keep the GUI responsive even if
+			 * these tasks hang.
 			 */
 			new Thread(() -> {
 				// Attempt connection to the server
 				if (initializeConnection(args, config)) {
-					// Invoke the share manager to periodically scan the share directory and list or delist
+					// Invoke the share manager to periodically scan the share directory and list or
+					// delist
 					// any files that are added to or removed from that directory
 					shareManager = new ShareManager(shareDir, tracker, peerID, localAddress, localPort);
 					int heartbeatPeriodSeconds = Math.max(10, (int) (60 * 0.75 * tracker.getTTL()));
 					shareManager.startMonitoring(heartbeatPeriodSeconds);
 
-					// Pass the now-instantiated tracker to the GUI 
+					// Pass the now-instantiated tracker to the GUI
 					SwingUtilities.invokeLater(() -> gui.setTracker(tracker));
 
-					// Start the listener thread for incoming connections and handling file transfers 
+					// Start the listener thread for incoming connections and handling file
+					// transfers
 					int maxConnections = config.getIntProperty("client.max_simultaneous_connections", 4);
 					PeerServer listener = new PeerServer(localPort, shareDir, maxConnections);
 					serverThread = new Thread(listener);
 					serverThread.setDaemon(true);
 					serverThread.start();
-			
+
 				} else {
-					// Show error dialog when the server is not found 
+					// Show error dialog when the server is not found
 					SwingUtilities.invokeLater(() -> {
-						JOptionPane.showMessageDialog(gui, 
-								"Fatal Error: Could not connect to the Catalog Server.\n" + 
-								"Please check your network settings and server status.",
-								"Connection Failed",
-								JOptionPane.ERROR_MESSAGE);
+						JOptionPane.showMessageDialog(gui,
+								"Fatal Error: Could not connect to the Catalog Server.\n"
+										+ "Please check your network settings and server status.",
+								"Connection Failed", JOptionPane.ERROR_MESSAGE);
+						System.exit(1);
 					});
 				}
 			}).start();
 		});
-		
+
 	} // main
-	
+
+	/**
+	 * Initializes the local directories to ensure that they exist. If the
+	 * directories cannot be created, this method will spawn an error popup window
+	 * before halting execution.
+	 */
+	private static void initDirectories() {
+		ensureDirExists(shareDir, "Share Directory");
+		ensureDirExists(downloadDir, "Download Directory");
+	} // initDirectories
+
+	/* initDirectories helper */
+	private static void ensureDirExists(Path p, String name) {
+		try {
+			Files.createDirectories(p);
+			System.out.println("[SYS] " + name + " ready: " + p.toAbsolutePath());
+		} catch (IOException ioe) {
+			String errMsg = "Fatal Error: Could not initialize " + name + "Path: " + p.toAbsolutePath() + "Reason: "
+					+ ioe.getMessage();
+			// Log the message
+			System.err.println(errMsg);
+
+			// Create a popup window displaying the error message
+			javax.swing.JOptionPane.showMessageDialog(null, errMsg, "Filesystem Error",
+					javax.swing.JOptionPane.ERROR_MESSAGE);
+
+			// Terminate the process; if either share or download directories do not
+			// exist, the program cannot function
+			System.exit(1);
+		}
+	} // ensureDirExists
+
 	/**
 	 * Sets the shutdown hook
 	 */
@@ -150,13 +188,14 @@ public class CatalogClient {
 			}
 		}));
 	} // setShutdownHook
-	
+
 	/**
-	 * Determines the client's local IP address which is necessary for allowing other clients to connect
-	 * and download files once they have been found on the share server.
+	 * Determines the client's local IP address which is necessary for allowing
+	 * other clients to connect and download files once they have been found on the
+	 * share server.
 	 * 
-	 * Note: this method for finding the local address was found via a Baeldung article:
-	 * https://www.baeldung.com/java-get-ip-address
+	 * Note: this method for finding the local address was found via a Baeldung
+	 * article: https://www.baeldung.com/java-get-ip-address
 	 * 
 	 * @return a String representing the local IP address of the client program.
 	 */
@@ -169,12 +208,14 @@ public class CatalogClient {
 			return "127.0.0.1";
 		}
 	}
-	
+
 	/**
-	 * Creates a connection to the catalog server. 
+	 * Creates a connection to the catalog server.
 	 * 
-	 * @param args Any command line argument that may have been passed to CatalogClient for configuration.
-	 * @param config The ConfigLoader object that parses the properties file containing persistent configuration.
+	 * @param args   Any command line argument that may have been passed to
+	 *               CatalogClient for configuration.
+	 * @param config The ConfigLoader object that parses the properties file
+	 *               containing persistent configuration.
 	 * @return true if the connection successfully initialized; false otherwise
 	 */
 	private static boolean initializeConnection(String[] args, ConfigLoader config) {
@@ -183,9 +224,9 @@ public class CatalogClient {
 
 		// Fetch the location of the server and the port it is accepting connections on
 		Properties orbProps = new Properties();
-		orbProps.put("org.omg.CORBA.ORBInitialHost", serverHost);		
+		orbProps.put("org.omg.CORBA.ORBInitialHost", serverHost);
 		orbProps.put("org.omg.CORBA.ORBInitialPort", serverPort);
-		
+
 		try {
 			// Initialize the ORB
 			ORB orb = ORB.init(args, orbProps);
@@ -193,20 +234,19 @@ public class CatalogClient {
 			// Discover the Catalog Server via name service
 			org.omg.CORBA.Object objRef = orb.resolve_initial_references("NameService");
 			NamingContextExt ncRef = NamingContextExtHelper.narrow(objRef);
-			
+
 			// Bind the remote FileTracker object
 			tracker = FileTrackerHelper.narrow(ncRef.resolve_str("CatalogService"));
-			
+
 			// Connection succeeded
-			System.out.println("[SYS] Successfully connected to catalog server at " + 
-								serverHost + ":" + serverPort);
+			System.out.println("[SYS] Successfully connected to catalog server at " + serverHost + ":" + serverPort);
 			return true;
-			
+
 		} catch (org.omg.CORBA.COMM_FAILURE cf) {
 			System.err.println("[CONN] Server unreachable. Check host/port in client.properties");
 		} catch (Exception e) {
 			System.err.println("[ERROR] Connection failed: " + e.getMessage());
-		} 
+		}
 		// Connection failed due to exception above
 		return false;
 	} // initializeConnection

@@ -14,10 +14,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import catalog_api.FileTracker;
@@ -91,10 +93,14 @@ public class ShareManager {
 				// Get the files that are current present in the share directory
 				Set<String> currDiskFiles = new HashSet<>();
 				try (Stream<Path> stream = Files.list(this.shareDir)) {
-					// No files in the directory; immediately exit the loop/method
-					if (stream.count() == 0) { break; }
+					List<Path> paths = stream.collect(Collectors.toList());
 
-					stream.filter(Files::isRegularFile).filter(p -> {
+					// No files in the directory; immediately exit the loop/method
+					if (paths.isEmpty()) { 
+						break; 
+					}
+
+					paths.stream().filter(Files::isRegularFile).filter(p -> {
 						try {
 							return !Files.isHidden(p);
 						} catch (IOException ioe) {
@@ -145,7 +151,8 @@ public class ShareManager {
 				}
 
 			} catch (IOException ioe) {
-				System.err.println("[SHARE] Directory syn error " + ioe.getMessage());
+				System.err.println("[SHARE] Directory sync error " + ioe.getMessage());
+				ioe.printStackTrace();
 			} 
 		} while (needsRetry);
 	} // syncDirectory

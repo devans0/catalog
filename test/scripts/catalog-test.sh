@@ -20,7 +20,7 @@ mkdir -p "${share1}" "${share2}" "${down1}" "${down2}"
 # Start the Catalog Server
 java -cp "${bin_dir}:${lib_dir}" catalog_application.server.CatalogServer &
 server_pid=$!
-sleep 3
+sleep 5
 
 # Start Client 1 (seeder) on port 2051
 java -cp "${bin_dir}:${lib_dir}" catalog_application.client.CatalogClient \

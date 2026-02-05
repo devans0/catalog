@@ -9,10 +9,6 @@
 
 package catalog_application.client;
 
-import catalog_utils.ConfigLoader;
-
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -20,7 +16,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.file.attribute.FileTime;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
+import catalog_utils.ConfigLoader;
 
 /**
  * Class IdentityManager is responsible for providing a UUID for a client that is used for identifying

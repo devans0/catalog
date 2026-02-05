@@ -10,8 +10,6 @@
 
 package catalog_application.server;
 
-import catalog_utils.ConfigLoader;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -35,10 +33,10 @@ public class DatabaseConfig {
 	 * @param config ConfigLoader object containing the configuration obtained from a properties file;
 	 * this object must be instantiated prior to initializing the DatabaseConfig object. 
 	 */
-	public static void initialize(ConfigLoader config) {
-		url = config.getProperty("db.url");
-		user = config.getProperty("db.user");
-		pass = config.getProperty("db.password");
+	public static void initialize(String dbUrl, String dbUser, String dbPass) {
+		url = dbUrl;
+		user = dbUser;
+		pass = dbPass;
 		
 		/*
 		 * Initialized must be true before database configuration or getConnection(), called from
@@ -92,7 +90,7 @@ public class DatabaseConfig {
 			String sqlInit = new String(Files.readAllBytes(Paths.get("setup.sql")));
 			
 			try (Statement stmt = conn.createStatement()) {
-				stmt.executeQuery(sqlInit);
+				stmt.executeUpdate(sqlInit);
 			}
 		} catch (IOException ioe) {
 			System.err.println("[DB] Could not find setup.sql in root directory.");

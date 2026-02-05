@@ -10,16 +10,13 @@
 
 package catalog_application.client;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Path;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.ExecutorService;
-
-import catalog_utils.ConfigLoader;
 
 public class PeerServer implements Runnable {
 	private final int port;
