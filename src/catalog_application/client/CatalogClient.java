@@ -37,6 +37,7 @@ import catalog_utils.ConfigLoader;
 public class CatalogClient {
 	// Default values
 	private static final int DEFAULT_PORT = 2050;
+	private static final String DEFAULT_TZ = "UTC";
 	private static final String DEFAULT_SHARE_DIR = "./share";
 	private static final String DEFAULT_DOWNLOAD_DIR = "./downloads";
 	
@@ -51,11 +52,7 @@ public class CatalogClient {
 	private static ShareManager shareManager;
 	
 	public static void main(String args[]) {
-		// Command-line runtime customization 
-		if (args.length != 0) {
-			
-		}
-		
+
 		// Load the configuration file which controls the behaviour of the client
 		ConfigLoader config = new ConfigLoader("client.properties");
 		
@@ -63,15 +60,32 @@ public class CatalogClient {
 		IdentityManager IDManager = new IdentityManager();
 		peerID = IDManager.getPeerID();
 		localAddress = getLocalIP();
-		localPort = config.getIntProperty("client.share_port", 2050);	
+		localPort = config.getIntProperty("client.share_port", DEFAULT_PORT);	
 		
 		// Set the time zone
-		String timezone = config.getProperty("app.timezone", "UTC");
+		String timezone = config.getProperty("app.timezone", DEFAULT_TZ);
 		TimeZone.setDefault(TimeZone.getTimeZone(timezone));
 		
 		// Set the share and download directories
-		shareDir = Paths.get(config.getProperty("client.share_dir", "./share"));
-		downloadDir = Paths.get(config.getProperty("client.download_dir", "./downloads"));
+		shareDir = Paths.get(config.getProperty("client.share_dir", DEFAULT_SHARE_DIR));
+		downloadDir = Paths.get(config.getProperty("client.download_dir", DEFAULT_DOWNLOAD_DIR));
+
+		/*
+		 * Command-line runtime customization. When run from the command line, arguments
+		 * must be supplied to the Catalog Client in the following order:
+		 * 
+		 * [port] [share directory] [download directory]
+		 * 
+		 * Each of these arguments are required if command-line customization is to be
+		 * used. If these arguments are supplied then they will override the properties
+		 * found in client.properties. This is to be used to run multiple instances of
+		 * the client on the same host for testing and debugging purposes.
+		 */
+		if (args.length != 0) {
+			localPort = Integer.parseInt(args[0]);
+			shareDir = Paths.get(args[1]);
+			downloadDir = Paths.get(args[2]);
+		}
 
 		// Set shutdown tasks
 		setShutdownHooks();
@@ -99,7 +113,8 @@ public class CatalogClient {
 					SwingUtilities.invokeLater(() -> gui.setTracker(tracker));
 
 					// Start the listener thread for incoming connections and handling file transfers 
-					PeerServer listener = new PeerServer(config);
+					int maxConnections = config.getIntProperty("client.max_simultaneous_connections", 4);
+					PeerServer listener = new PeerServer(localPort, shareDir, maxConnections);
 					serverThread = new Thread(listener);
 					serverThread.setDaemon(true);
 					serverThread.start();

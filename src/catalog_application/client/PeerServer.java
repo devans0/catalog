@@ -23,15 +23,13 @@ import catalog_utils.ConfigLoader;
 
 public class PeerServer implements Runnable {
 	private final int port;
-	private final int maxConnections;
 	private final Path shareDir;
 	private ExecutorService threadPool;
 	
-	public PeerServer(ConfigLoader config) {
-		this.port = config.getIntProperty("client.share_port", 9001);
-		this.shareDir = Paths.get(config.getProperty("client.share_dir", "./share"));
-		this.maxConnections = config.getIntProperty("client.max_simultaneous_connections", 4);
-		this.threadPool = Executors.newFixedThreadPool(this.maxConnections);
+	public PeerServer(int port, Path shareDir, int maxConnections) {
+		this.port = port;
+		this.shareDir = shareDir;
+		this.threadPool = Executors.newFixedThreadPool(maxConnections);
 	} //ctor
 	
 	/**

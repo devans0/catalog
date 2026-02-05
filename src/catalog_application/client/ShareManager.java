@@ -67,20 +67,22 @@ public class ShareManager {
 		int retries = 0;
 		boolean needsRetry = false;
 		
-		/* 
-		 * This loop enables immediate retries of the synchronization. This may be necessary if
-		 * the server does not have any records of the files that the client expects to have
-		 * registered with the server.  
+		/*
+		 * This loop enables immediate retries of the synchronization. This may be
+		 * necessary if the server does not have any records of the files that the
+		 * client expects to have registered with the server.
 		 * 
-		 * The call to keepAlive() that constitutes the heartbeat may return false which indicates
-		 * that the server has not updated any listings that are associated with the client. If
-		 * the client assumes that it has at least one file registered with the server for sharing
-		 * then a false return on the heartbeat indicates that there is some issue; either the files
-		 * have been reaped by the server or listing of the files failed. In either case, the
-		 * client should immediately attempt to re-register its entire share directory.
+		 * The call to keepAlive() that constitutes the heartbeat may return false which
+		 * indicates that the server has not updated any listings that are associated
+		 * with the client. The client may safely assume that it has at least one file
+		 * registered with the server for sharing so a false return on the heartbeat
+		 * indicates that there is some issue; either active files have been reaped by
+		 * the server or listing of the files failed. In either case, the client should
+		 * immediately attempt to re-register its entire share directory.
 		 * 
-		 * The number of retries are limited to three per invocation of this method to avoid
-		 * having a client overwhelm the server with retries in the event of a malfunction.
+		 * The number of retries are limited to three per invocation of this method to
+		 * avoid having a client overwhelm the server with retries in the event of a
+		 * malfunction.
 		 */
 		do {
 			// Reset
