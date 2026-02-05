@@ -4,13 +4,13 @@ Configuring the environment for testing involves two crucial steps:
 
 1. Ensuring that the correct JVM/JDK is in use.
 
-To do this, ensure that the JDK8 binary is in the system path prior to compiling
-or running the program. This is platform dependent, but as an example the system
-PATH on a UNIX system might be altered thusly:
+ To do this, ensure that the JDK8 binary is in the system path prior to compiling
+ or running the program. This is platform dependent, but as an example the system
+ PATH on a UNIX system might be altered thusly:
 
     PATH="$PATH":<path-to-jdk8>
 
-or on Windows:
+ or on Windows:
 
     set PATH=%PATH%;<path-to-jdk8>
 
