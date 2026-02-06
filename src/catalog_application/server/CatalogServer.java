@@ -10,6 +10,8 @@
 package catalog_application.server;
 
 import java.io.IOException;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.sql.Connection;
@@ -48,13 +50,15 @@ public class CatalogServer {
 	private static String dbPassword;
 
 	public static void main(String[] args) {
-		// Load the configuration and extract values
+		// Load the configuration and extract configured values
 		ConfigLoader config = new ConfigLoader("server.properties");
 		serverPort = config.getProperty("server.port", DEFAULT_SERVER_PORT);
-		serverHost = config.getProperty("server.host", DEFAULT_SERVER_HOST);
 		dbURL = config.getProperty("db.url", DEFAULT_DB_URL);
 		dbUser = config.getProperty("db.user", DEFAULT_DB_USER);
 		dbPassword = config.getProperty("db.password", DEFAULT_DB_PASS);
+		
+		// Find the local IPv4 host address for the server
+		serverHost = findLocalIP();
 
 		// Set time zone; this avoids any issues arising from the reaper and the system
 		// times being at odds with one another potentially causing premature reaping
@@ -146,6 +150,21 @@ public class CatalogServer {
 			e.printStackTrace();
 		}
 	} // main
+	
+	/**
+	 * Find the IP address of the host the server is running on.
+	 * 
+	 * @return String IPv4 address of the local host; null if there is any failure
+	 *         to do so.
+	 */
+	private static String findLocalIP() {
+		try (final DatagramSocket sock = new DatagramSocket()) {
+			sock.connect(InetAddress.getByName("8.8.8.8"), 10002);
+			return sock.getLocalAddress().getHostAddress();
+		} catch (Exception e) {
+			return DEFAULT_SERVER_HOST;
+		}
+	} // findLocalIP
 
 	/**
 	 * Starts the orbd naming service that will handle connections to the server
@@ -171,7 +190,7 @@ public class CatalogServer {
 			// Ensure that errors or messages are printed on the server console
 			pb.inheritIO();
 			Process orbdProcess = pb.start();
-			System.out.println("[SYS] Naming service (orbd) starting on port " + port);
+			System.out.println("[SYS] Naming service (orbd) starting on " + serverHost + ":" + port);
 
 			// Give orbd time to bind to a socket before server initialization proceeds
 			Thread.sleep(2000);

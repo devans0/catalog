@@ -4,31 +4,83 @@
 # version: 1.0
 # copyright: 2026 Dominic Evans
 
-$SANDBOX = "test\sandbox"
-$BIN_DIR = "bin"
-$LIB_DIR = "lib\*"
+$ProjectRootDir = $PSScriptRoot
+$NumClients = if ($args[0]) { [int]$args[0] } else { 2 }
+$BasePort = 2050
 
-# Clean up and create sandbox directories
-if (Test-Path $SANDBOX) { Remove-Item -Recurse -Force $SANDBOX }
-New-Item -ItemType Directory -Path "$SANDBOX\share1"
-New-Item -ItemType Directory -Path "$SANDBOX\down1"
-New-Item -ItemType Directory -Path "$SANDBOX\share2"
-New-Item -ItemType Directory -Path "$SANDBOX\down2"
+$BinDir = Join-Path $ProjectRootDir "bin"
+$LibDir = Join-Path $ProjectRootDir "lib\*"
+$Sandbox = Join-Path $ProjectRootDir "test\sandbox"
+$Classpath = "$BinDir;$LibDir"
 
-Start-Process java -ArgumentList "-cp `"$BIN_DIR;$LIB_DIR`" catalog_application.server.CatalogServer"
-Start-Sleep -s 3
+# Array to store process objects
+$Processes = @()
 
-# Start Client 1 on port 2051
-Start-Process java -ArgumentList "-cp `"$BIN_DIR;$LIB_DIR`" catalog_application.client.CatalogClient 2051 $SANDBOX\share1 $SANDBOX\down1"
+# Cleanup Function
+function Cleanup-Processes {
+    Write-Host "`n[TEST] Cleaning up background processes..."
+    foreach ($proc in $Processes) {
+        if ($null -ne $proc -and !$proc.HasExited) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            Write-Host "Stopped process $($proc.Id)"
+        }
+    }
+    exit
+}
 
-# Start Client 2 on port 2052
-Start-Process java -ArgumentList "-cp `"$BIN_DIR;$LIB_DIR`" catalog_application.client.CatalogClient 2052 $SANDBOX\share2 $SANDBOX\down2"
+# Set the trap to stop all created processes using any key
+$ConsoleId = [runspace]::DefaultRunspace.Id
+Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Cleanup-Processes }
 
-Write-Host "-------------------------------------------------------"
-Write-Host "[TEST] Server and clients are live"
-Write-Host "[TEST] Client 1 share directory: $SANDBOX\share1"
-Write-Host "[TEST] Client 1 download directory: $SANDBOX\download1"
-Write-Host "[TEST] Client 2 share directory: $SANDBOX\share2"
-Write-Host "[TEST] Client 2 download directory: $SANDBOX\download2"
-Write-Host "[TEST] Close the Java windows  to terminate processes"
-Write-Host "-------------------------------------------------------"
+# Remove and recreate sandbox
+if (Test-Path $Sandbox) { Remove-Item -Recurse -Force $Sandbox }
+New-Item -ItemType Directory -Path $Sandbox -Force | Out-Null
+
+# Start Catalog Server
+Write-Host "[TEST] Starting Catalog Server..."
+$ServerProc = Start-Process java -ArgumentList "-cp `"$Classpath`" catalog_application.server.CatalogServer" `
+    -WorkingDirectory $ProjectRootDir -NoNewWindow -PassThru
+$Processes += $ServerProc
+
+# Allow server time to initialize
+Start-Sleep -Seconds 5
+
+# Start Clients
+for ($i = 1; $i -le $NumClients; $i++) {
+    $ClientDir = New-Item -ItemType Directory -Path (Join-Path $Sandbox "client_$i") -Force
+    $ClientPort = $BasePort + $i
+
+    # Use FullName to ensure we have absolute paths
+    $SharePath = (New-Item -ItemType Directory -Path (Join-Path $ClientDir "share") -Force).FullName
+    $DownloadPath = (New-Item -ItemType Directory -Path (Join-Path $ClientDir "download") -Force).FullName
+
+    # Create unique file
+    Set-Content -Path (Join-Path $SharePath "client_$i`_file.txt") -Value "Data from client $i"
+
+    # Copy properties
+    Copy-Item (Join-Path $ProjectRootDir "client.properties") $ClientDir.FullName
+
+    Write-Host "[TEST] Starting Client $i on Port $ClientPort..." -ForegroundColor Cyan
+
+    $JavaArgs = @(
+        "-cp", $ClassPath,
+        "catalog_application.client.CatalogClient",
+        $ClientPort,
+        $SharePath,
+        $DownloadPath
+    )
+
+    $ClientProc = Start-Process java -ArgumentList $JavaArgs -WorkingDirectory $ClientDir.FullName -NoNewWindow -PassThru
+    $Processes += $ClientProc
+}
+
+Write-Host "[TEST] $NumClients Clients running."
+Write-Host "[TEST] Press any key to stop all processes..."
+
+# Keep the script alive. In PowerShell, we wait for user input to trigger cleanup.
+try {
+    while ($true) { Start-Sleep -Seconds 1 }
+}
+finally {
+    Cleanup-Processes
+}
